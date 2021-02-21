@@ -15,14 +15,16 @@ func Test(t *testing.T) {
 	mtx := sync.Mutex{}
 
 	for i := 0; i < 100; i++ {
-		wq.Schedule(func(ctx context.Context) {
+		wq.Schedule(func(ctx context.Context) error {
 			mtx.Lock()
 			defer mtx.Unlock()
 
 			checkvalue++
+			return nil
 		})
 	}
 
-	wq.RunAll(context.TODO())
-	require.Equal(t, 100, checkvalue)
+	errors := wq.RunAll(context.TODO())
+	require.Equal(t, 100, checkvalue, "Unexpected number of jobs executed")
+	require.Equal(t, 0, len(errors), "Some unexpected errors occurred")
 }

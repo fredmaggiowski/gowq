@@ -2,11 +2,12 @@ package gowq
 
 import (
 	"context"
+	"fmt"
 	"sync"
 )
 
-// A Job is a simple function.
-type Job func(context.Context)
+// A Job is a simple function that should be executed in a limited set of routines.
+type Job func(context.Context) error
 
 // WorkQueue represents the instance of a queue of jobs.
 type WorkQueue struct {
@@ -24,11 +25,14 @@ func NewWQ(workers int) *WorkQueue {
 }
 
 // RunAll runs all scheduled jobs and returns when all jobs terminated.
-func (w *WorkQueue) RunAll(ctx context.Context) {
+func (w *WorkQueue) RunAll(ctx context.Context) []error {
 	workersQueue := make(chan bool, w.nWorkers)
 
 	var waitGroup sync.WaitGroup
 	waitGroup.Add(len(w.jobQueue))
+
+	errorList := make([]error, 0)
+	errorsLock := sync.Mutex{}
 
 	for i := 0; i < len(w.jobQueue); i++ {
 		job := w.jobQueue[i]
@@ -36,14 +40,21 @@ func (w *WorkQueue) RunAll(ctx context.Context) {
 		workersQueue <- true
 
 		go func(c context.Context, i int) {
-			job(ctx)
+			if err := job(ctx); err != nil {
+				errorsLock.Lock()
+				errorList = append(
+					errorList,
+					fmt.Errorf("job %d failed: %w", i, err),
+				)
+				errorsLock.Unlock()
+			}
 
 			waitGroup.Done()
 			_ = <-workersQueue
 		}(ctx, i)
 	}
 	waitGroup.Wait()
-	return
+	return errorList
 }
 
 // Schedule can be used to append a new job to the work queue.
