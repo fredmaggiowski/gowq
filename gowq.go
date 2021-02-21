@@ -54,6 +54,7 @@ func (w *WorkQueue) RunAll(ctx context.Context) []error {
 		}(ctx, i)
 	}
 	waitGroup.Wait()
+	close(workersQueue)
 	return errorList
 }
 
