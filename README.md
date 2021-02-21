@@ -1,4 +1,4 @@
-# gowq
+# goWQ
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/fredmaggiowski/gowq)](https://goreportcard.com/report/github.com/fredmaggiowski/gowq)
 
