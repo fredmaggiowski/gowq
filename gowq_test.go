@@ -3,8 +3,10 @@ package gowq
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -83,5 +85,27 @@ func TestInRange(t *testing.T) {
 
 	errors := wq.RunAll(context.TODO())
 	require.Equal(t, 100+90+80+70+60+50+40+30+20+10, checkvalue, "Unexpected number of jobs executed")
+	require.Equal(t, 0, len(errors), "Some unexpected errors occurred")
+}
+
+func TestWithRandomTimeouts(t *testing.T) {
+	wq := NewWQ(5)
+
+	checkvalue := 0
+	mtx := sync.Mutex{}
+
+	for i := 0; i < 6; i++ {
+		wq.Schedule(func(ctx context.Context) error {
+			mtx.Lock()
+			defer mtx.Unlock()
+
+			time.Sleep(time.Duration(rand.Intn(10)*100) * time.Millisecond)
+			checkvalue++
+			return nil
+		})
+	}
+
+	errors := wq.RunAll(context.TODO())
+	require.Equal(t, 6, checkvalue, "Unexpected number of jobs executed")
 	require.Equal(t, 0, len(errors), "Some unexpected errors occurred")
 }
