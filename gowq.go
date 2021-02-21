@@ -5,9 +5,10 @@ import (
 	"sync"
 )
 
-// Job .
+// A Job is a simple function.
 type Job func(context.Context)
 
+// WorkQueue represents the instance of a queue of jobs.
 type WorkQueue struct {
 	nWorkers int
 
@@ -22,6 +23,7 @@ func NewWQ(workers int) *WorkQueue {
 	}
 }
 
+// RunAll runs all scheduled jobs and returns when all jobs terminated.
 func (w *WorkQueue) RunAll(ctx context.Context) {
 	workersQueue := make(chan bool, w.nWorkers)
 
@@ -44,6 +46,7 @@ func (w *WorkQueue) RunAll(ctx context.Context) {
 	return
 }
 
+// Schedule can be used to append a new job to the work queue.
 func (w *WorkQueue) Schedule(job Job) {
 	w.jobQueue = append(w.jobQueue, job)
 }
