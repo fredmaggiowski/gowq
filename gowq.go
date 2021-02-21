@@ -5,19 +5,19 @@ import (
 	"sync"
 )
 
+// Job .
 type Job func(context.Context)
 
 type WorkQueue struct {
 	nWorkers int
-	// workersQueue []chan bool
 
 	jobQueue []Job
 }
 
+// NewWQ creates a new WorkQueue instance to schedule jobs.
 func NewWQ(workers int) *WorkQueue {
 	return &WorkQueue{
 		nWorkers: workers,
-		// workersQueue: make([]chan bool, workers),
 		jobQueue: make([]Job, 0),
 	}
 }
