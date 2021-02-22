@@ -2,6 +2,7 @@ package gowq
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -52,9 +53,12 @@ func TestStaticWQ(t *testing.T) {
 			})
 		}
 
-		errors := wq.RunAll(context.TODO())
+		errorsList := wq.RunAll(context.TODO())
 		require.Equal(t, 50, checkvalue, "Unexpected number of jobs executed")
-		require.Equal(t, 50, len(errors), "Some unexpected errors occurred")
+		require.Equal(t, 50, len(errorsList), "Some unexpected errors occurred")
+		for i, err := range errorsList {
+			require.True(t, errors.Is(err, ErrJobFailed), "Unexpected error type for error[%d]: %s", i, err.Error())
+		}
 	})
 
 	t.Run("with random sleeps", func(t *testing.T) {

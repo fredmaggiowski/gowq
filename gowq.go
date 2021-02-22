@@ -13,17 +13,21 @@ var (
 	// ErrQueueNotStarted error used whenever an action is required on a dynamic queue
 	// that has not been started yet.
 	ErrQueueNotStarted = fmt.Errorf("Start must be called before")
+	// ErrJobFailed error is used to wrap errors provided by failing jobs.
+	ErrJobFailed = fmt.Errorf("job failed")
 )
 
 // WorkQueue represents the instance of a queue of jobs.
 type WorkQueue struct {
-	nWorkers int
-
+	// General properties.
+	nWorkers       int
 	errorsList     []error
 	errorsListLock sync.Mutex
 
+	// Static scheduler properties.
 	staticJobQueue []Job
 
+	// Dynamic scheduler properties.
 	dynamicJobQueue      chan Job
 	dynamicJobQueueLock  sync.Mutex
 	shutdownRequired     bool
@@ -74,7 +78,7 @@ func (w *WorkQueue) RunAll(ctx context.Context) []error {
 
 		go func(c context.Context, i int) {
 			if err := job(ctx); err != nil {
-				w.appendError(fmt.Errorf("job %d failed: %w", i, err))
+				w.appendError(fmt.Errorf("%w [%d]: %s", ErrJobFailed, i, err.Error()))
 			}
 
 			waitGroup.Done()

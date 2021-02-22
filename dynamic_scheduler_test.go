@@ -79,6 +79,9 @@ func TestDynamicWQ(t *testing.T) {
 
 		errorsList := wq.GetErrors(false)
 		require.Equal(t, 50, len(errorsList), "Unexpected number of errors")
+		for i, err := range errorsList {
+			require.True(t, errors.Is(err, ErrJobFailed), "Unexpected error type for error[%d]: %s", i, err.Error())
+		}
 	})
 }
 

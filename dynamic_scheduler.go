@@ -28,7 +28,7 @@ func (w *WorkQueue) Start(ctx context.Context) {
 
 		go func(ctx context.Context) {
 			if err := job(ctx); err != nil {
-				w.appendError(fmt.Errorf("job failed: %w", err))
+				w.appendError(fmt.Errorf("%w: %s", ErrJobFailed, err.Error()))
 			}
 			_ = <-workersQueue
 		}(ctx)
@@ -60,6 +60,7 @@ func (w *WorkQueue) Shutdown() bool {
 func (w *WorkQueue) ensureQueueStarted(method string) {
 	w.dynamicJobQueueLock.Lock()
 	defer w.dynamicJobQueueLock.Unlock()
+
 	if w.dynamicJobQueue == nil {
 		panic(fmt.Errorf("%s failed: %w", method, ErrQueueNotStarted))
 	}
