@@ -107,3 +107,36 @@ func TestInRangeShouldCopyItemToPreventScopeShadowing(t *testing.T) {
 	require.Equal(t, 100+90+80+70+60+50+40+30+20+10, checkvalue, "Unexpected number of jobs executed")
 	require.Equal(t, 0, len(errors), "Some unexpected errors occurred")
 }
+
+func TestDynamicWQ(t *testing.T) {
+	t.Run("basic setup", func(t *testing.T) {
+		wq := NewWQ(5)
+
+		var startWait sync.WaitGroup
+		startWait.Add(1)
+		go func() {
+			wq.Start(context.TODO())
+			startWait.Done()
+		}()
+
+		checkvalue := 0
+		mtx := sync.Mutex{}
+		time.Sleep(1 * time.Second)
+		for i := 0; i < 10; i++ {
+			wq.Enqueue(func(ctx context.Context) error {
+				mtx.Lock()
+				checkvalue++
+				mtx.Unlock()
+				return nil
+			})
+		}
+
+		terminated := wq.Shutdown()
+
+		require.True(t, terminated, "Start has not terminated yet")
+
+		mtx.Lock()
+		require.Equal(t, 10, checkvalue, "Unexpected number of jobs executed")
+		mtx.Unlock()
+	})
+}
