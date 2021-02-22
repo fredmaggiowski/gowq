@@ -37,9 +37,11 @@ type WorkQueue struct {
 
 // NewWQ creates a new WorkQueue instance to schedule jobs.
 func NewWQ(workers int) *WorkQueue {
-	return &WorkQueue{
+	w := &WorkQueue{
 		nWorkers: workers,
 	}
+	w.unsafeInitErrorsList()
+	return w
 }
 
 // GetErrors returns the list of errors that occurred during job execution.
@@ -47,11 +49,12 @@ func NewWQ(workers int) *WorkQueue {
 func (w *WorkQueue) GetErrors(flush bool) []error {
 	w.errorsListLock.Lock()
 	list := w.errorsList[:]
-	w.errorsListLock.Unlock()
 
 	if flush {
-		w.FlushErrors()
+		w.unsafeFlushErrors()
+		w.unsafeInitErrorsList()
 	}
+	w.errorsListLock.Unlock()
 	return list
 }
 
@@ -59,7 +62,8 @@ func (w *WorkQueue) GetErrors(flush bool) []error {
 func (w *WorkQueue) FlushErrors() {
 	w.errorsListLock.Lock()
 	defer w.errorsListLock.Unlock()
-	w.errorsList = nil
+	w.unsafeFlushErrors()
+	w.unsafeInitErrorsList()
 }
 
 func (w *WorkQueue) appendError(err error) {
@@ -67,4 +71,12 @@ func (w *WorkQueue) appendError(err error) {
 	defer w.errorsListLock.Unlock()
 
 	w.errorsList = append(w.errorsList, err)
+}
+
+func (w *WorkQueue) unsafeFlushErrors() {
+	w.errorsList = nil
+}
+
+func (w *WorkQueue) unsafeInitErrorsList() {
+	w.errorsList = make([]error, 0)
 }

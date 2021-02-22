@@ -26,15 +26,23 @@ func TestDynamicWQ(t *testing.T) {
 		mtx := sync.Mutex{}
 		time.Sleep(1 * time.Second)
 		for i := 0; i < 100; i++ {
-			wq.Schedule(func(ctx context.Context) error {
+			err := wq.Schedule(func(ctx context.Context) error {
 				mtx.Lock()
 				checkvalue++
 				mtx.Unlock()
 				return nil
 			})
+			require.Equal(t, err, nil, "Unexpected error")
+			if i == 99 {
+				fmt.Printf("************************ ALL SCHEDULED\n")
+
+			}
 		}
 
+		fmt.Printf("************************ SHUTDOWN\n")
+
 		terminated := wq.Shutdown()
+		fmt.Printf("************************ PROCESS TERMINATED\n")
 
 		require.True(t, terminated, "Start has not terminated yet")
 

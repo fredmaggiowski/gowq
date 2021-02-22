@@ -16,32 +16,61 @@ func (w *WorkQueue) Start(ctx context.Context) {
 	workersQueue := make(chan bool, w.nWorkers)
 
 	for {
+		// w.dynamicJobQueueLock.Lock()
+		jobQueueLength := len(w.dynamicJobQueue)
+		// w.dynamicJobQueueLock.Unlock()
+
 		w.shutdownRequiredLock.Lock()
-		if w.shutdownRequired && len(w.dynamicJobQueue) == 0 {
+		fmt.Printf("+++++++++++++++++++++ SHUTDOWN? %t %d\n", w.shutdownRequired, jobQueueLength)
+
+		if w.shutdownRequired && jobQueueLength == 0 {
 			w.shutdownRequiredLock.Unlock()
+			fmt.Printf("+++++++++++++++++++++ STOPPING ITERATION\n")
 			break
+		}
+
+		if w.shutdownRequired {
+			fmt.Printf("SHUT DOWN HAS BEEN REQUIRED BUT %d %d", jobQueueLength, len(w.dynamicJobQueue))
 		}
 		w.shutdownRequiredLock.Unlock()
 
+		fmt.Printf("WAITING FOR JOB %d %d - %d\n", jobQueueLength, len(w.dynamicJobQueue), len(workersQueue))
 		job := <-w.dynamicJobQueue
+		fmt.Printf("Waiting for worker for job\n")
 		workersQueue <- true
+		fmt.Printf("Found worker for job\n")
 
 		go func(ctx context.Context) {
 			if err := job(ctx); err != nil {
 				w.appendError(fmt.Errorf("%w: %s", ErrJobFailed, err.Error()))
 			}
+
 			_ = <-workersQueue
+			fmt.Printf("worker released\n")
 		}(ctx)
 	}
 
+	fmt.Printf("+++++++++++++++++++++ ITERATION STOPPED\n")
+
 	close(w.dynamicJobQueue)
+	fmt.Printf("CHAN CLOSED\n")
+
 	w.shutdownChan <- true
 }
 
 // Schedule sends a new job to the scheduler.
-func (w *WorkQueue) Schedule(job Job) {
+func (w *WorkQueue) Schedule(job Job) error {
+	w.shutdownRequiredLock.Lock()
+
+	if w.shutdownRequired {
+		w.shutdownRequiredLock.Unlock()
+		return fmt.Errorf("shutdown has been required")
+	}
+	w.shutdownRequiredLock.Unlock()
+
 	w.ensureQueueStarted("Schedule")
 	w.dynamicJobQueue <- job
+	return nil
 }
 
 // Shutdown signals the job scheduler that it should terminate execution and
@@ -49,11 +78,13 @@ func (w *WorkQueue) Schedule(job Job) {
 // Note that the scheduler will run until the job queue is not empty.
 func (w *WorkQueue) Shutdown() bool {
 	w.ensureQueueStarted("Shutdown")
+	fmt.Printf("Required shutdown signal still %d\n", len(w.dynamicJobQueue))
 
 	w.shutdownRequiredLock.Lock()
 	w.shutdownRequired = true
 	w.shutdownRequiredLock.Unlock()
 
+	fmt.Printf("Issued shutdown signal, waiting\n")
 	return <-w.shutdownChan
 }
 
