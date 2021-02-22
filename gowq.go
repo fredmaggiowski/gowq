@@ -9,11 +9,17 @@ import (
 // A Job is a simple function that should be executed in a limited set of routines.
 type Job func(context.Context) error
 
+var (
+	// ErrQueueNotStarted error used whenever an action is required on a dynamic queue
+	// that has not been started yet.
+	ErrQueueNotStarted = fmt.Errorf("Start must be called before")
+)
+
 // WorkQueue represents the instance of a queue of jobs.
 type WorkQueue struct {
 	nWorkers int
 
-	jobQueue []Job
+	staticJobQueue []Job
 
 	dynamicJobQueue      chan Job
 	dynamicJobQueueLock  sync.Mutex
@@ -26,7 +32,6 @@ type WorkQueue struct {
 func NewWQ(workers int) *WorkQueue {
 	return &WorkQueue{
 		nWorkers: workers,
-		jobQueue: make([]Job, 0),
 	}
 }
 
@@ -58,19 +63,20 @@ func (w *WorkQueue) Start(ctx context.Context) {
 
 	close(w.dynamicJobQueue)
 	w.shutdownChan <- true
+}
 
+func (w *WorkQueue) ensureQueueStarted(method string) {
+	w.dynamicJobQueueLock.Lock()
+	defer w.dynamicJobQueueLock.Unlock()
+	if w.dynamicJobQueue == nil {
+		panic(fmt.Errorf("%s failed: %w", method, ErrQueueNotStarted))
+	}
 }
 
 // Enqueue sends a new job to the scheduler, it blocks when the job queue is
 // full until there's space available for a new job.
 func (w *WorkQueue) Enqueue(job Job) {
-	w.dynamicJobQueueLock.Lock()
-	defer w.dynamicJobQueueLock.Unlock()
-
-	if w.dynamicJobQueue == nil {
-		panic("Must start WQ before enqueue can be used")
-	}
-
+	w.ensureQueueStarted("Enqueue")
 	w.dynamicJobQueue <- job
 }
 
@@ -78,6 +84,8 @@ func (w *WorkQueue) Enqueue(job Job) {
 // then waits until the scheduler actually ends.
 // Note that the scheduler will run until the job queue is not empty.
 func (w *WorkQueue) Shutdown() bool {
+	w.ensureQueueStarted("Shutdown")
+
 	w.shutdownRequiredLock.Lock()
 	w.shutdownRequired = true
 	w.shutdownRequiredLock.Unlock()
@@ -121,5 +129,8 @@ func (w *WorkQueue) RunAll(ctx context.Context) []error {
 
 // Schedule can be used to append a new job to the work queue.
 func (w *WorkQueue) Schedule(job Job) {
-	w.jobQueue = append(w.jobQueue, job)
+	if w.staticJobQueue == nil {
+		w.staticJobQueue = make([]Job, 0)
+	}
+	w.staticJobQueue = append(w.staticJobQueue, job)
 }

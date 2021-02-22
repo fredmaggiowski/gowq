@@ -2,6 +2,7 @@ package gowq
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -139,4 +140,59 @@ func TestDynamicWQ(t *testing.T) {
 		require.Equal(t, 10, checkvalue, "Unexpected number of jobs executed")
 		mtx.Unlock()
 	})
+}
+
+func TestEnqueue(t *testing.T) {
+	t.Run("can't Enqueue before Start", func(t *testing.T) {
+		var panicOccurred bool
+		var panicError error
+		defer func() {
+			if r := recover(); r != nil {
+				panicOccurred = true
+				panicError = r.(error)
+			}
+		}()
+
+		wq := NewWQ(10)
+		wq.Enqueue(fakeJob)
+
+		require.True(t, panicOccurred, "A panic was expected")
+		require.True(t, errors.Is(panicError, ErrQueueNotStarted), "Unexpected error type")
+	})
+
+	t.Run("Job is actually enqueued", func(t *testing.T) {
+		wq := NewWQ(10)
+		simulateStart(wq, 1)
+
+		require.Equal(t, len(wq.dynamicJobQueue), 0, "Unexpected job queue before enqueue")
+		wq.Enqueue(fakeJob)
+		require.Equal(t, len(wq.dynamicJobQueue), 1, "Unexpected job queue after enqueue")
+	})
+}
+
+func TestShutdown(t *testing.T) {
+	t.Run("can't Shutdown before Start", func(t *testing.T) {
+		var panicOccurred bool
+		var panicError error
+		defer func() {
+			if r := recover(); r != nil {
+				panicOccurred = true
+				panicError = r.(error)
+			}
+		}()
+
+		wq := NewWQ(10)
+		wq.Shutdown()
+
+		require.True(t, panicOccurred, "A panic was expected")
+		require.True(t, errors.Is(panicError, ErrQueueNotStarted), "Unexpected error type")
+	})
+}
+
+func fakeJob(ctx context.Context) error {
+	return nil
+}
+
+func simulateStart(wq *WorkQueue, size int) {
+	wq.dynamicJobQueue = make(chan Job, size)
 }
