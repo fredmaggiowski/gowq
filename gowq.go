@@ -38,7 +38,7 @@ func NewWQ(workers int) *WorkQueue {
 // Start runs the job scheduler, it blocks unless a new job is available.
 func (w *WorkQueue) Start(ctx context.Context) {
 	w.dynamicJobQueueLock.Lock()
-	w.dynamicJobQueue = make(chan Job, w.nWorkers)
+	w.dynamicJobQueue = make(chan Job, 0)
 	w.shutdownChan = make(chan bool)
 	w.dynamicJobQueueLock.Unlock()
 
@@ -73,8 +73,7 @@ func (w *WorkQueue) ensureQueueStarted(method string) {
 	}
 }
 
-// Enqueue sends a new job to the scheduler, it blocks when the job queue is
-// full until there's space available for a new job.
+// Enqueue sends a new job to the scheduler.
 func (w *WorkQueue) Enqueue(job Job) {
 	w.ensureQueueStarted("Enqueue")
 	w.dynamicJobQueue <- job
@@ -98,13 +97,13 @@ func (w *WorkQueue) RunAll(ctx context.Context) []error {
 	workersQueue := make(chan bool, w.nWorkers)
 
 	var waitGroup sync.WaitGroup
-	waitGroup.Add(len(w.jobQueue))
+	waitGroup.Add(len(w.staticJobQueue))
 
 	errorList := make([]error, 0)
 	errorsLock := sync.Mutex{}
 
-	for i := 0; i < len(w.jobQueue); i++ {
-		job := w.jobQueue[i]
+	for i := 0; i < len(w.staticJobQueue); i++ {
+		job := w.staticJobQueue[i]
 
 		workersQueue <- true
 

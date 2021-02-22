@@ -9,6 +9,7 @@ It can be used in two modes:
  - *dynamic*: allows to run a job scheduler and then enqueue new jobs while the scheduler runs.
 
 ## Examples
+
 ### Static Queue Usage
 
 ```go

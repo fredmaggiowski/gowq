@@ -111,7 +111,7 @@ func TestInRangeShouldCopyItemToPreventScopeShadowing(t *testing.T) {
 
 func TestDynamicWQ(t *testing.T) {
 	t.Run("basic setup", func(t *testing.T) {
-		wq := NewWQ(5)
+		wq := NewWQ(3)
 
 		var startWait sync.WaitGroup
 		startWait.Add(1)
@@ -123,7 +123,7 @@ func TestDynamicWQ(t *testing.T) {
 		checkvalue := 0
 		mtx := sync.Mutex{}
 		time.Sleep(1 * time.Second)
-		for i := 0; i < 10; i++ {
+		for i := 0; i < 100; i++ {
 			wq.Enqueue(func(ctx context.Context) error {
 				mtx.Lock()
 				checkvalue++
@@ -137,7 +137,7 @@ func TestDynamicWQ(t *testing.T) {
 		require.True(t, terminated, "Start has not terminated yet")
 
 		mtx.Lock()
-		require.Equal(t, 10, checkvalue, "Unexpected number of jobs executed")
+		require.Equal(t, 100, checkvalue, "Unexpected number of jobs executed")
 		mtx.Unlock()
 	})
 }
