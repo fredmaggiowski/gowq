@@ -19,6 +19,9 @@ var (
 type WorkQueue struct {
 	nWorkers int
 
+	errorsList     []error
+	errorsListLock sync.Mutex
+
 	staticJobQueue []Job
 
 	dynamicJobQueue      chan Job
@@ -35,61 +38,24 @@ func NewWQ(workers int) *WorkQueue {
 	}
 }
 
-// Start runs the job scheduler, it blocks unless a new job is available.
-func (w *WorkQueue) Start(ctx context.Context) {
-	w.dynamicJobQueueLock.Lock()
-	w.dynamicJobQueue = make(chan Job, 0)
-	w.shutdownChan = make(chan bool)
-	w.dynamicJobQueueLock.Unlock()
+// GetErrors returns the list of errors that occurred during job execution.
+// If flush argument is set to true the internal error list gets flushed.
+func (w *WorkQueue) GetErrors(flush bool) []error {
+	w.errorsListLock.Lock()
+	list := w.errorsList[:]
+	w.errorsListLock.Unlock()
 
-	workersQueue := make(chan bool, w.nWorkers)
-
-	for {
-		w.shutdownRequiredLock.Lock()
-		if w.shutdownRequired && len(w.dynamicJobQueue) == 0 {
-			w.shutdownRequiredLock.Unlock()
-			break
-		}
-		w.shutdownRequiredLock.Unlock()
-
-		nextJob := <-w.dynamicJobQueue
-		workersQueue <- true
-
-		go func(ctx context.Context) {
-			nextJob(ctx)
-			_ = <-workersQueue
-		}(ctx)
+	if flush {
+		w.FlushErrors()
 	}
-
-	close(w.dynamicJobQueue)
-	w.shutdownChan <- true
+	return list
 }
 
-func (w *WorkQueue) ensureQueueStarted(method string) {
-	w.dynamicJobQueueLock.Lock()
-	defer w.dynamicJobQueueLock.Unlock()
-	if w.dynamicJobQueue == nil {
-		panic(fmt.Errorf("%s failed: %w", method, ErrQueueNotStarted))
-	}
-}
-
-// Enqueue sends a new job to the scheduler.
-func (w *WorkQueue) Enqueue(job Job) {
-	w.ensureQueueStarted("Enqueue")
-	w.dynamicJobQueue <- job
-}
-
-// Shutdown signals the job scheduler that it should terminate execution and
-// then waits until the scheduler actually ends.
-// Note that the scheduler will run until the job queue is not empty.
-func (w *WorkQueue) Shutdown() bool {
-	w.ensureQueueStarted("Shutdown")
-
-	w.shutdownRequiredLock.Lock()
-	w.shutdownRequired = true
-	w.shutdownRequiredLock.Unlock()
-
-	return <-w.shutdownChan
+// FlushErrors can be used to clean error list.
+func (w *WorkQueue) FlushErrors() {
+	w.errorsListLock.Lock()
+	defer w.errorsListLock.Unlock()
+	w.errorsList = nil
 }
 
 // RunAll runs all scheduled jobs and returns when all jobs terminated.
@@ -99,8 +65,7 @@ func (w *WorkQueue) RunAll(ctx context.Context) []error {
 	var waitGroup sync.WaitGroup
 	waitGroup.Add(len(w.staticJobQueue))
 
-	errorList := make([]error, 0)
-	errorsLock := sync.Mutex{}
+	w.errorsList = make([]error, 0)
 
 	for i := 0; i < len(w.staticJobQueue); i++ {
 		job := w.staticJobQueue[i]
@@ -109,12 +74,7 @@ func (w *WorkQueue) RunAll(ctx context.Context) []error {
 
 		go func(c context.Context, i int) {
 			if err := job(ctx); err != nil {
-				errorsLock.Lock()
-				errorList = append(
-					errorList,
-					fmt.Errorf("job %d failed: %w", i, err),
-				)
-				errorsLock.Unlock()
+				w.appendError(fmt.Errorf("job %d failed: %w", i, err))
 			}
 
 			waitGroup.Done()
@@ -123,7 +83,8 @@ func (w *WorkQueue) RunAll(ctx context.Context) []error {
 	}
 	waitGroup.Wait()
 	close(workersQueue)
-	return errorList
+
+	return w.GetErrors(true)
 }
 
 // Schedule can be used to append a new job to the work queue.
@@ -132,4 +93,11 @@ func (w *WorkQueue) Schedule(job Job) {
 		w.staticJobQueue = make([]Job, 0)
 	}
 	w.staticJobQueue = append(w.staticJobQueue, job)
+}
+
+func (w *WorkQueue) appendError(err error) {
+	w.errorsListLock.Lock()
+	defer w.errorsListLock.Unlock()
+
+	w.errorsList = append(w.errorsList, err)
 }
