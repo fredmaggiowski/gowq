@@ -7,9 +7,10 @@ import (
 
 // Start runs the job scheduler, it blocks unless a new job is available.
 func (w *WorkQueue) Start(ctx context.Context) {
+	w.shutdownChan = make(chan bool)
+
 	w.dynamicJobQueueLock.Lock()
 	w.dynamicJobQueue = make(chan Job, 0)
-	w.shutdownChan = make(chan bool)
 	w.dynamicJobQueueLock.Unlock()
 
 	workersQueue := make(chan bool, w.nWorkers)
