@@ -15,7 +15,7 @@ It can be used in two modes:
 ```go
 wq := NewWQ(2)
 
-wq.Schedule(func(ctx context.Context) error {
+wq.Push(func(ctx context.Context) error {
     // do something...
     return nil
 })
@@ -31,7 +31,7 @@ go func(ctx context.Context) {
     wq.Start(ctx)
 }(context.TODO())
 
-wq.Enqueue(func(ctx context.Context) error {
+wq.Schedule(func(ctx context.Context) error {
     // do something...
     return nil
 })

@@ -18,7 +18,7 @@ func TestStaticWQ(t *testing.T) {
 		checkvalue := 0
 		mtx := sync.Mutex{}
 		for i := 0; i < 100; i++ {
-			wq.Schedule(func(ctx context.Context) error {
+			wq.Push(func(ctx context.Context) error {
 				mtx.Lock()
 				defer mtx.Unlock()
 
@@ -39,7 +39,7 @@ func TestStaticWQ(t *testing.T) {
 		mtx := sync.Mutex{}
 		for i := 0; i < 100; i++ {
 			j := i
-			wq.Schedule(func(ctx context.Context) error {
+			wq.Push(func(ctx context.Context) error {
 				if j%2 == 0 {
 					return fmt.Errorf("error %d", j)
 				}
@@ -63,7 +63,7 @@ func TestStaticWQ(t *testing.T) {
 		checkvalue := 0
 		mtx := sync.Mutex{}
 		for i := 0; i < 6; i++ {
-			wq.Schedule(func(ctx context.Context) error {
+			wq.Push(func(ctx context.Context) error {
 				mtx.Lock()
 				defer mtx.Unlock()
 
@@ -94,7 +94,7 @@ func TestStaticWQInRangeShouldCopyItemToPreventScopeShadowing(t *testing.T) {
 
 	for _, item := range items {
 		itemCopy := item
-		wq.Schedule(func(ctx context.Context) error {
+		wq.Push(func(ctx context.Context) error {
 			mtx.Lock()
 			defer mtx.Unlock()
 

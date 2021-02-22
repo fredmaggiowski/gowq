@@ -26,7 +26,7 @@ func TestDynamicWQ(t *testing.T) {
 		mtx := sync.Mutex{}
 		time.Sleep(1 * time.Second)
 		for i := 0; i < 100; i++ {
-			wq.Enqueue(func(ctx context.Context) error {
+			wq.Schedule(func(ctx context.Context) error {
 				mtx.Lock()
 				checkvalue++
 				mtx.Unlock()
@@ -58,7 +58,7 @@ func TestDynamicWQ(t *testing.T) {
 		time.Sleep(1 * time.Second)
 		for i := 0; i < 100; i++ {
 			j := i
-			wq.Enqueue(func(ctx context.Context) error {
+			wq.Schedule(func(ctx context.Context) error {
 				if j%2 == 0 {
 					return fmt.Errorf("error %d", j)
 				}
@@ -82,8 +82,8 @@ func TestDynamicWQ(t *testing.T) {
 	})
 }
 
-func TestEnqueue(t *testing.T) {
-	t.Run("can't Enqueue before Start", func(t *testing.T) {
+func TestSchedule(t *testing.T) {
+	t.Run("can't Schedule before Start", func(t *testing.T) {
 		var panicOccurred bool
 		var panicError error
 		defer func() {
@@ -94,7 +94,7 @@ func TestEnqueue(t *testing.T) {
 		}()
 
 		wq := NewWQ(10)
-		wq.Enqueue(fakeJob)
+		wq.Schedule(fakeJob)
 
 		require.True(t, panicOccurred, "A panic was expected")
 		require.True(t, errors.Is(panicError, ErrQueueNotStarted), "Unexpected error type")
@@ -105,7 +105,7 @@ func TestEnqueue(t *testing.T) {
 		simulateStart(wq, 1)
 
 		require.Equal(t, len(wq.dynamicJobQueue), 0, "Unexpected job queue before enqueue")
-		wq.Enqueue(fakeJob)
+		wq.Schedule(fakeJob)
 		require.Equal(t, len(wq.dynamicJobQueue), 1, "Unexpected job queue after enqueue")
 	})
 }

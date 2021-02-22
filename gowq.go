@@ -87,8 +87,8 @@ func (w *WorkQueue) RunAll(ctx context.Context) []error {
 	return w.GetErrors(true)
 }
 
-// Schedule can be used to append a new job to the work queue.
-func (w *WorkQueue) Schedule(job Job) {
+// Push can be used to append a new job to the work queue.
+func (w *WorkQueue) Push(job Job) {
 	if w.staticJobQueue == nil {
 		w.staticJobQueue = make([]Job, 0)
 	}

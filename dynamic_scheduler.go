@@ -38,9 +38,9 @@ func (w *WorkQueue) Start(ctx context.Context) {
 	w.shutdownChan <- true
 }
 
-// Enqueue sends a new job to the scheduler.
-func (w *WorkQueue) Enqueue(job Job) {
-	w.ensureQueueStarted("Enqueue")
+// Schedule sends a new job to the scheduler.
+func (w *WorkQueue) Schedule(job Job) {
+	w.ensureQueueStarted("Schedule")
 	w.dynamicJobQueue <- job
 }
 
