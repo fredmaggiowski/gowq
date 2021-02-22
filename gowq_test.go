@@ -2,6 +2,7 @@ package gowq
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -18,7 +19,7 @@ func TestStaticWQ(t *testing.T) {
 		checkvalue := 0
 		mtx := sync.Mutex{}
 		for i := 0; i < 100; i++ {
-			wq.Schedule(func(ctx context.Context) error {
+			wq.Push(func(ctx context.Context) error {
 				mtx.Lock()
 				defer mtx.Unlock()
 
@@ -39,7 +40,7 @@ func TestStaticWQ(t *testing.T) {
 		mtx := sync.Mutex{}
 		for i := 0; i < 100; i++ {
 			j := i
-			wq.Schedule(func(ctx context.Context) error {
+			wq.Push(func(ctx context.Context) error {
 				if j%2 == 0 {
 					return fmt.Errorf("error %d", j)
 				}
@@ -52,9 +53,12 @@ func TestStaticWQ(t *testing.T) {
 			})
 		}
 
-		errors := wq.RunAll(context.TODO())
+		errorsList := wq.RunAll(context.TODO())
 		require.Equal(t, 50, checkvalue, "Unexpected number of jobs executed")
-		require.Equal(t, 50, len(errors), "Some unexpected errors occurred")
+		require.Equal(t, 50, len(errorsList), "Some unexpected errors occurred")
+		for i, err := range errorsList {
+			require.True(t, errors.Is(err, ErrJobFailed), "Unexpected error type for error[%d]: %s", i, err.Error())
+		}
 	})
 
 	t.Run("with random sleeps", func(t *testing.T) {
@@ -63,7 +67,7 @@ func TestStaticWQ(t *testing.T) {
 		checkvalue := 0
 		mtx := sync.Mutex{}
 		for i := 0; i < 6; i++ {
-			wq.Schedule(func(ctx context.Context) error {
+			wq.Push(func(ctx context.Context) error {
 				mtx.Lock()
 				defer mtx.Unlock()
 
@@ -79,7 +83,7 @@ func TestStaticWQ(t *testing.T) {
 	})
 }
 
-func TestInRangeShouldCopyItemToPreventScopeShadowing(t *testing.T) {
+func TestStaticWQInRangeShouldCopyItemToPreventScopeShadowing(t *testing.T) {
 	wq := NewWQ(2)
 
 	checkvalue := 0
@@ -94,7 +98,7 @@ func TestInRangeShouldCopyItemToPreventScopeShadowing(t *testing.T) {
 
 	for _, item := range items {
 		itemCopy := item
-		wq.Schedule(func(ctx context.Context) error {
+		wq.Push(func(ctx context.Context) error {
 			mtx.Lock()
 			defer mtx.Unlock()
 
