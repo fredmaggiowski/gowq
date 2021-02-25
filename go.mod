@@ -1,4 +1,4 @@
-module gowq
+module github.com/fredmaggiowski/gowq
 
 go 1.15
 
