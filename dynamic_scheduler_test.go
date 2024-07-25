@@ -13,7 +13,7 @@ import (
 
 func TestDynamicWQ(t *testing.T) {
 	t.Run("basic setup", func(t *testing.T) {
-		wq := NewWQ(3)
+		wq := New(3)
 
 		var startWait sync.WaitGroup
 		startWait.Add(1)
@@ -44,7 +44,7 @@ func TestDynamicWQ(t *testing.T) {
 	})
 
 	t.Run("error management", func(t *testing.T) {
-		wq := NewWQ(10)
+		wq := New(10)
 		var startWait sync.WaitGroup
 
 		startWait.Add(1)
@@ -96,7 +96,7 @@ func TestSchedule(t *testing.T) {
 			}
 		}()
 
-		wq := NewWQ(10)
+		wq := New(10)
 		wq.Schedule(fakeJob)
 
 		require.True(t, panicOccurred, "A panic was expected")
@@ -104,7 +104,7 @@ func TestSchedule(t *testing.T) {
 	})
 
 	t.Run("Job is actually enqueued", func(t *testing.T) {
-		wq := NewWQ(10)
+		wq := New(10).(*workQueue)
 		simulateStart(wq, 1)
 
 		require.Equal(t, len(wq.dynamicJobQueue), 0, "Unexpected job queue before enqueue")
@@ -124,7 +124,7 @@ func TestShutdown(t *testing.T) {
 			}
 		}()
 
-		wq := NewWQ(10)
+		wq := New(10)
 		wq.Shutdown()
 
 		require.True(t, panicOccurred, "A panic was expected")

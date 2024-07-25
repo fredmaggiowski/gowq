@@ -14,7 +14,7 @@ import (
 
 func TestStaticWQ(t *testing.T) {
 	t.Run("basic setup", func(t *testing.T) {
-		wq := NewWQ(10)
+		wq := New(10)
 
 		checkvalue := 0
 		mtx := sync.Mutex{}
@@ -34,7 +34,7 @@ func TestStaticWQ(t *testing.T) {
 	})
 
 	t.Run("error management", func(t *testing.T) {
-		wq := NewWQ(10)
+		wq := New(10)
 
 		checkvalue := 0
 		mtx := sync.Mutex{}
@@ -62,7 +62,7 @@ func TestStaticWQ(t *testing.T) {
 	})
 
 	t.Run("with random sleeps", func(t *testing.T) {
-		wq := NewWQ(5)
+		wq := New(5)
 
 		checkvalue := 0
 		mtx := sync.Mutex{}
@@ -84,7 +84,7 @@ func TestStaticWQ(t *testing.T) {
 }
 
 func TestStaticWQInRangeShouldCopyItemToPreventScopeShadowing(t *testing.T) {
-	wq := NewWQ(2)
+	wq := New(2)
 
 	checkvalue := 0
 	mtx := sync.Mutex{}

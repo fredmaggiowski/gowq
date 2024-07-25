@@ -7,7 +7,7 @@ import (
 )
 
 // RunAll runs all scheduled jobs and returns when all jobs terminated.
-func (w *WorkQueue) RunAll(ctx context.Context) []error {
+func (w *workQueue) RunAll(ctx context.Context) []error {
 	workersQueue := make(chan bool, w.nWorkers)
 
 	var waitGroup sync.WaitGroup
@@ -26,7 +26,7 @@ func (w *WorkQueue) RunAll(ctx context.Context) []error {
 			}
 
 			waitGroup.Done()
-			_ = <-workersQueue
+			<-workersQueue
 		}(ctx, i)
 	}
 	waitGroup.Wait()
@@ -36,7 +36,7 @@ func (w *WorkQueue) RunAll(ctx context.Context) []error {
 }
 
 // Push can be used to append a new job to the work queue.
-func (w *WorkQueue) Push(job Job) {
+func (w *workQueue) Push(job Job) {
 	if w.staticJobQueue == nil {
 		w.staticJobQueue = make([]Job, 0)
 	}
