@@ -7,3 +7,10 @@ test:
 .PHONY: build
 build:
 	@go build -v ./...
+
+assert-version:
+	@test -n "$(VERSION)" || (echo "VERSION is required" ; exit 1)
+
+.PHONY: version
+version: assert-version
+	@git tag v${VERSION}
