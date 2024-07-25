@@ -71,7 +71,7 @@ func TestStaticWQ(t *testing.T) {
 				mtx.Lock()
 				defer mtx.Unlock()
 
-				time.Sleep(time.Duration(rand.Intn(10)*100) * time.Millisecond)
+				time.Sleep(time.Duration(rand.Intn(10)*50) * time.Millisecond)
 				checkvalue++
 				return nil
 			})

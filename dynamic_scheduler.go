@@ -3,6 +3,7 @@ package gowq
 import (
 	"context"
 	"fmt"
+	"time"
 )
 
 // Start runs the job scheduler, it blocks unless a new job is available.
@@ -17,13 +18,22 @@ func (w *workQueue) Start(ctx context.Context) {
 
 	for {
 		w.shutdownRequiredLock.Lock()
-		if w.shutdownRequired && len(w.dynamicJobQueue) == 0 {
-			w.shutdownRequiredLock.Unlock()
-			break
-		}
+		shutdownRequired := w.shutdownRequired
 		w.shutdownRequiredLock.Unlock()
 
-		job := <-w.dynamicJobQueue
+		if shutdownRequired && len(w.dynamicJobQueue) == 0 {
+			break
+		}
+
+		var job Job
+
+		select {
+		case job = <-w.dynamicJobQueue:
+		default:
+			time.Sleep(1 * time.Millisecond)
+			continue
+		}
+
 		workersQueue <- true
 
 		go func(ctx context.Context) {
