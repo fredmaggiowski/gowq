@@ -15,7 +15,7 @@ It can be used in two modes:
 ### Static Queue Usage
 
 ```go
-wq := NewWQ[MyResult](2)
+wq := New[MyResult](2)
 
 wq.Push(func(ctx context.Context) (MyResult, error) {
     // do something...
@@ -27,7 +27,7 @@ errors := wq.RunAll(context.TODO())
 ### Dynamic Queue Manager
 
 ```go
-wq := NewWQ[MyResult](2)
+wq := New[MyResult](2)
 
 go func(ctx context.Context) {
     wq.Start(ctx)
