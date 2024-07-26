@@ -7,11 +7,11 @@ import (
 )
 
 // Start runs the job scheduler, it blocks unless a new job is available.
-func (w *workQueue) Start(ctx context.Context) {
+func (w *workQueue[Result]) Start(ctx context.Context) {
 	w.shutdownChan = make(chan bool)
 
 	w.dynamicJobQueueLock.Lock()
-	w.dynamicJobQueue = make(chan Job)
+	w.dynamicJobQueue = make(chan Job[Result])
 	w.dynamicJobQueueLock.Unlock()
 
 	workersQueue := make(chan bool, w.nWorkers)
@@ -25,7 +25,7 @@ func (w *workQueue) Start(ctx context.Context) {
 			break
 		}
 
-		var job Job
+		var job Job[Result]
 
 		select {
 		case job = <-w.dynamicJobQueue:
@@ -37,8 +37,11 @@ func (w *workQueue) Start(ctx context.Context) {
 		workersQueue <- true
 
 		go func(ctx context.Context) {
-			if err := job(ctx); err != nil {
+			result, err := job(ctx)
+			if err != nil {
 				w.appendError(fmt.Errorf("%w: %s", ErrJobFailed, err.Error()))
+			} else {
+				w.appendResult(result)
 			}
 			<-workersQueue
 		}(ctx)
@@ -49,7 +52,7 @@ func (w *workQueue) Start(ctx context.Context) {
 }
 
 // Schedule sends a new job to the scheduler.
-func (w *workQueue) Schedule(job Job) {
+func (w *workQueue[Result]) Schedule(job Job[Result]) {
 	w.ensureQueueStarted("Schedule")
 	w.dynamicJobQueue <- job
 }
@@ -57,7 +60,7 @@ func (w *workQueue) Schedule(job Job) {
 // Shutdown signals the job scheduler that it should terminate execution and
 // then waits until the scheduler actually ends.
 // Note that the scheduler will run until the job queue is not empty.
-func (w *workQueue) Shutdown() bool {
+func (w *workQueue[Result]) Shutdown() bool {
 	w.ensureQueueStarted("Shutdown")
 
 	w.shutdownRequiredLock.Lock()
@@ -67,7 +70,7 @@ func (w *workQueue) Shutdown() bool {
 	return <-w.shutdownChan
 }
 
-func (w *workQueue) ensureQueueStarted(method string) {
+func (w *workQueue[Result]) ensureQueueStarted(method string) {
 	w.dynamicJobQueueLock.Lock()
 	defer w.dynamicJobQueueLock.Unlock()
 

@@ -2,10 +2,14 @@ package gowq
 
 import "context"
 
-func fakeJob(ctx context.Context) error {
-	return nil
+func fakeJob(ctx context.Context) (*FakeResult, error) {
+	return nil, nil
 }
 
-func simulateStart(wq *workQueue, size int) {
-	wq.dynamicJobQueue = make(chan Job, size)
+func simulateStart(wq *workQueue[*FakeResult], size int) {
+	wq.dynamicJobQueue = make(chan Job[*FakeResult], size)
+}
+
+type FakeResult struct {
+	id int
 }

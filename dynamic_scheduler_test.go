@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -13,7 +15,7 @@ import (
 
 func TestDynamicWQ(t *testing.T) {
 	t.Run("basic setup", func(t *testing.T) {
-		wq := New(3)
+		wq := New[*FakeResult](3)
 
 		var startWait sync.WaitGroup
 		startWait.Add(1)
@@ -26,11 +28,11 @@ func TestDynamicWQ(t *testing.T) {
 		mtx := sync.Mutex{}
 		time.Sleep(1 * time.Second)
 		for i := 0; i < 100; i++ {
-			wq.Schedule(func(ctx context.Context) error {
+			wq.Schedule(func(ctx context.Context) (*FakeResult, error) {
 				mtx.Lock()
 				checkvalue++
 				mtx.Unlock()
-				return nil
+				return nil, nil
 			})
 		}
 
@@ -44,7 +46,7 @@ func TestDynamicWQ(t *testing.T) {
 	})
 
 	t.Run("error management", func(t *testing.T) {
-		wq := New(10)
+		wq := New[*FakeResult](10)
 		var startWait sync.WaitGroup
 
 		startWait.Add(1)
@@ -58,19 +60,21 @@ func TestDynamicWQ(t *testing.T) {
 		time.Sleep(1 * time.Second)
 		for i := 0; i < 100; i++ {
 			j := i
-			wq.Schedule(func(ctx context.Context) error {
+			wq.Schedule(func(ctx context.Context) (*FakeResult, error) {
+				time.Sleep(time.Duration(rand.Intn(10)*10) * time.Millisecond)
+
 				if j%2 == 0 {
-					return fmt.Errorf("error %d", j)
+					return nil, fmt.Errorf("error %d", j)
 				}
 				mtx.Lock()
 				checkvalue++
 				mtx.Unlock()
-				return nil
+				return &FakeResult{id: j}, nil
 			})
 		}
 
 		terminated := wq.Shutdown()
-
+		time.Sleep(1 * time.Second)
 		require.True(t, terminated, "Start has not terminated yet")
 
 		mtx.Lock()
@@ -82,6 +86,22 @@ func TestDynamicWQ(t *testing.T) {
 		for i, err := range errorsList {
 			require.True(t, errors.Is(err, ErrJobFailed), "Unexpected error type for error[%d]: %s", i, err.Error())
 		}
+
+		resultsList := wq.GetResults()
+		require.Len(t, resultsList, 50)
+		expectedResults := make([]int, 0)
+		for i := 0; i < 100; i++ {
+			if i%2 != 0 {
+				expectedResults = append(expectedResults, i)
+			}
+		}
+		resultIds := make([]int, 0)
+		for _, result := range resultsList {
+			resultIds = append(resultIds, result.id)
+		}
+
+		slices.Sort(resultIds)
+		require.Equal(t, expectedResults, resultIds)
 	})
 }
 
@@ -96,7 +116,7 @@ func TestSchedule(t *testing.T) {
 			}
 		}()
 
-		wq := New(10)
+		wq := New[*FakeResult](10)
 		wq.Schedule(fakeJob)
 
 		require.True(t, panicOccurred, "A panic was expected")
@@ -104,7 +124,7 @@ func TestSchedule(t *testing.T) {
 	})
 
 	t.Run("Job is actually enqueued", func(t *testing.T) {
-		wq := New(10).(*workQueue)
+		wq := New[*FakeResult](10).(*workQueue[*FakeResult])
 		simulateStart(wq, 1)
 
 		require.Equal(t, len(wq.dynamicJobQueue), 0, "Unexpected job queue before enqueue")
@@ -124,7 +144,7 @@ func TestShutdown(t *testing.T) {
 			}
 		}()
 
-		wq := New(10)
+		wq := New[*FakeResult](10)
 		wq.Shutdown()
 
 		require.True(t, panicOccurred, "A panic was expected")

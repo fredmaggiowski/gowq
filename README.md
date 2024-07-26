@@ -6,8 +6,9 @@
 A simple work queue manager to schedule jobs and then execute them on a defined pool of goroutines.
 
 It can be used in two modes: 
- - *static*: allows to create a job queue and then run it waiting for all jobs to complete;
- - *dynamic*: allows to run a job scheduler and then enqueue new jobs while the scheduler runs.
+
+- *static*: allows to create a job queue and then run it waiting for all jobs to complete;
+- *dynamic*: allows to run a job scheduler and then enqueue new jobs while the scheduler runs.
 
 ## Examples
 
