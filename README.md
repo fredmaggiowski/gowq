@@ -21,7 +21,7 @@ wq.Push(func(ctx context.Context) (MyResult, error) {
     // do something...
     return MyResult{}, nil
 })
-errors := wq.RunAll(context.TODO())
+results, errors := wq.RunAll(context.TODO())
 ```
 
 ### Dynamic Queue Manager
