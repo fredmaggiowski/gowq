@@ -6,8 +6,10 @@ import (
 	"sync"
 )
 
+type JobResult interface{}
+
 // A Job is a simple function that should be executed in a limited set of routines.
-type Job func(context.Context) error
+type Job[T JobResult] func(context.Context) (T, error)
 
 var (
 	// ErrQueueNotStarted error used whenever an action is required on a dynamic queue
@@ -17,36 +19,40 @@ var (
 	ErrJobFailed = fmt.Errorf("job failed")
 )
 
-type DynamicScheduler interface {
+type DynamicScheduler[Result JobResult] interface {
 	Start(ctx context.Context)
-	Schedule(job Job)
+	Schedule(job Job[Result])
 	Shutdown() bool
 }
 
-type StaticScheduler interface {
-	RunAll(context.Context) []error
-	Push(job Job)
+type StaticScheduler[Result JobResult] interface {
+	RunAll(context.Context) ([]Result, []error)
+	Push(job Job[Result])
 }
 
-type Queue interface {
+type Queue[Result JobResult] interface {
+	GetResults() []Result
 	GetErrors(flush bool) []error
 	FlushErrors()
-	DynamicScheduler
-	StaticScheduler
+	DynamicScheduler[Result]
+	StaticScheduler[Result]
 }
 
 // workQueue represents the instance of a queue of jobs.
-type workQueue struct {
+type workQueue[Result JobResult] struct {
 	// General properties.
 	nWorkers       int
 	errorsList     []error
 	errorsListLock sync.Mutex
 
+	jobResults     []Result
+	jobResultsLock sync.Mutex
+
 	// Static scheduler properties.
-	staticJobQueue []Job
+	staticJobQueue []Job[Result]
 
 	// Dynamic scheduler properties.
-	dynamicJobQueue      chan Job
+	dynamicJobQueue      chan Job[Result]
 	dynamicJobQueueLock  sync.Mutex
 	shutdownRequired     bool
 	shutdownRequiredLock sync.Mutex
@@ -54,15 +60,15 @@ type workQueue struct {
 }
 
 // New creates a new WorkQueue instance to schedule jobs.
-func New(workers int) Queue {
-	return &workQueue{
+func New[Result JobResult](workers int) Queue[Result] {
+	return &workQueue[Result]{
 		nWorkers: workers,
 	}
 }
 
 // GetErrors returns the list of errors that occurred during job execution.
 // If flush argument is set to true the internal error list gets flushed.
-func (w *workQueue) GetErrors(flush bool) []error {
+func (w *workQueue[Result]) GetErrors(flush bool) []error {
 	w.errorsListLock.Lock()
 	list := w.errorsList[:]
 	w.errorsListLock.Unlock()
@@ -73,16 +79,33 @@ func (w *workQueue) GetErrors(flush bool) []error {
 	return list
 }
 
+// GetResult returns the list of results that have been returned during job execution.
+func (w *workQueue[Result]) GetResults() []Result {
+	w.jobResultsLock.Lock()
+	list := w.jobResults[:]
+	w.jobResultsLock.Unlock()
+	return list
+}
+
 // FlushErrors can be used to clean error list.
-func (w *workQueue) FlushErrors() {
+func (w *workQueue[Result]) FlushErrors() {
 	w.errorsListLock.Lock()
 	defer w.errorsListLock.Unlock()
 	w.errorsList = nil
 }
 
-func (w *workQueue) appendError(err error) {
+func (w *workQueue[Result]) appendError(err error) {
 	w.errorsListLock.Lock()
 	defer w.errorsListLock.Unlock()
 
 	w.errorsList = append(w.errorsList, err)
+}
+
+func (w *workQueue[Result]) appendResult(result Result) {
+	w.jobResultsLock.Lock()
+	defer w.jobResultsLock.Unlock()
+	if w.jobResults == nil {
+		w.jobResults = make([]Result, 0)
+	}
+	w.jobResults = append(w.jobResults, result)
 }

@@ -14,46 +14,46 @@ import (
 
 func TestStaticWQ(t *testing.T) {
 	t.Run("basic setup", func(t *testing.T) {
-		wq := New(10)
+		wq := New[*FakeResult](10)
 
 		checkvalue := 0
 		mtx := sync.Mutex{}
 		for i := 0; i < 100; i++ {
-			wq.Push(func(ctx context.Context) error {
+			wq.Push(func(ctx context.Context) (*FakeResult, error) {
 				mtx.Lock()
 				defer mtx.Unlock()
 
 				checkvalue++
-				return nil
+				return nil, nil
 			})
 		}
 
-		errors := wq.RunAll(context.TODO())
+		_, errors := wq.RunAll(context.TODO())
 		require.Equal(t, 100, checkvalue, "Unexpected number of jobs executed")
 		require.Equal(t, 0, len(errors), "Some unexpected errors occurred")
 	})
 
 	t.Run("error management", func(t *testing.T) {
-		wq := New(10)
+		wq := New[*FakeResult](10)
 
 		checkvalue := 0
 		mtx := sync.Mutex{}
 		for i := 0; i < 100; i++ {
 			j := i
-			wq.Push(func(ctx context.Context) error {
+			wq.Push(func(ctx context.Context) (*FakeResult, error) {
 				if j%2 == 0 {
-					return fmt.Errorf("error %d", j)
+					return nil, fmt.Errorf("error %d", j)
 				}
 
 				mtx.Lock()
 				defer mtx.Unlock()
 
 				checkvalue++
-				return nil
+				return nil, nil
 			})
 		}
 
-		errorsList := wq.RunAll(context.TODO())
+		_, errorsList := wq.RunAll(context.TODO())
 		require.Equal(t, 50, checkvalue, "Unexpected number of jobs executed")
 		require.Equal(t, 50, len(errorsList), "Some unexpected errors occurred")
 		for i, err := range errorsList {
@@ -62,29 +62,56 @@ func TestStaticWQ(t *testing.T) {
 	})
 
 	t.Run("with random sleeps", func(t *testing.T) {
-		wq := New(5)
+		wq := New[*FakeResult](5)
 
 		checkvalue := 0
 		mtx := sync.Mutex{}
 		for i := 0; i < 6; i++ {
-			wq.Push(func(ctx context.Context) error {
+			wq.Push(func(ctx context.Context) (*FakeResult, error) {
 				mtx.Lock()
 				defer mtx.Unlock()
 
 				time.Sleep(time.Duration(rand.Intn(10)*50) * time.Millisecond)
 				checkvalue++
-				return nil
+				return &FakeResult{}, nil
 			})
 		}
 
-		errors := wq.RunAll(context.TODO())
+		_, errors := wq.RunAll(context.TODO())
 		require.Equal(t, 6, checkvalue, "Unexpected number of jobs executed")
 		require.Equal(t, 0, len(errors), "Some unexpected errors occurred")
+	})
+
+	t.Run("verify results", func(t *testing.T) {
+		wq := New[*FakeResult](5)
+
+		checkvalue := 0
+		mtx := sync.Mutex{}
+		for i := 0; i < 6; i++ {
+			wq.Push(func(ctx context.Context) (*FakeResult, error) {
+				mtx.Lock()
+				defer mtx.Unlock()
+
+				checkvalue++
+				return &FakeResult{id: i}, nil
+			})
+		}
+
+		results, errors := wq.RunAll(context.TODO())
+		require.Equal(t, 6, checkvalue, "Unexpected number of jobs executed")
+		require.Equal(t, 0, len(errors), "Some unexpected errors occurred")
+
+		require.Equal(t, 6, len(results))
+		foundIds := make([]int, 6)
+		for _, result := range results {
+			foundIds[result.id] = result.id
+		}
+		require.Equal(t, []int{0, 1, 2, 3, 4, 5}, foundIds)
 	})
 }
 
 func TestStaticWQInRangeShouldCopyItemToPreventScopeShadowing(t *testing.T) {
-	wq := New(2)
+	wq := New[*FakeResult](2)
 
 	checkvalue := 0
 	mtx := sync.Mutex{}
@@ -98,16 +125,16 @@ func TestStaticWQInRangeShouldCopyItemToPreventScopeShadowing(t *testing.T) {
 
 	for _, item := range items {
 		itemCopy := item
-		wq.Push(func(ctx context.Context) error {
+		wq.Push(func(ctx context.Context) (*FakeResult, error) {
 			mtx.Lock()
 			defer mtx.Unlock()
 
 			checkvalue += itemCopy.val
-			return nil
+			return nil, nil
 		})
 	}
 
-	errors := wq.RunAll(context.TODO())
+	_, errors := wq.RunAll(context.TODO())
 	require.Equal(t, 100+90+80+70+60+50+40+30+20+10, checkvalue, "Unexpected number of jobs executed")
 	require.Equal(t, 0, len(errors), "Some unexpected errors occurred")
 }
