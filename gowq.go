@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-type JobResult interface{}
+type JobResult any
 
 // A Job is a simple function that should be executed in a limited set of routines.
 type Job[T JobResult] func(context.Context) (T, error)
