@@ -1,7 +1,6 @@
 # goWQ
 
 [![Build][build-svg]][build-link]
-[![Go Report Card][report-card-svg]][report-card-link]
 
 A simple work queue manager to schedule jobs and then execute them on a defined pool of goroutines.
 
